@@ -49,6 +49,7 @@ class RMI(Index):
         self._icpts = []
         self._err_lo = []
         self._err_hi = []
+        self._bounds = [0, 0]
 
     def build(self, keys):
         self._set_keys(keys)
@@ -59,6 +60,7 @@ class RMI(Index):
         self._err_lo = [0] * m
         self._err_hi = [0] * m
         self._ra = self._rb = 0.0
+        self._bounds = [0] * (m + 1)
         if n == 0:
             return self
 
@@ -84,6 +86,7 @@ class RMI(Index):
             self._icpts[j] = icpt
             self._err_lo[j] = int(math.floor(err.min()))
             self._err_hi[j] = int(math.ceil(err.max()))
+        self._bounds = [int(b) for b in bounds]
         return self
 
     def lower_bound(self, key):
@@ -97,17 +100,31 @@ class RMI(Index):
         # int() rounds towards zero, which is a valid bound in both directions
         lo = int(pred + self._err_lo[j])
         hi = int(pred + self._err_hi[j]) + 1
+        # The answer always lies inside the leaf's slice (routing is
+        # monotone), which also bounds the search for keys that were not in
+        # the training set and for leaves with poorly fitting models.
+        start = self._bounds[j]
+        end = self._bounds[j + 1]
+        if lo < start:
+            lo = start
+        if hi > end:
+            hi = end
+        if lo >= hi:
+            lo, hi = start, end
         return bounded_lower_bound(self._keys, key, lo, hi)
 
     def max_error(self):
         """Largest last-mile search window over all leaves."""
         if not self._err_hi:
             return 0
-        return max(h - l for l, h in zip(self._err_lo, self._err_hi))
+        windows = []
+        for j, (l, h) in enumerate(zip(self._err_lo, self._err_hi)):
+            windows.append(min(h - l, self._bounds[j + 1] - self._bounds[j]))
+        return max(windows)
 
     def size_bytes(self):
-        # root model + (slope, intercept, err_lo, err_hi) per leaf
-        return 16 + 32 * self.num_leaves
+        # root model + (slope, intercept, err_lo, err_hi, start) per leaf
+        return 16 + 40 * self.num_leaves
 
     def params(self):
         return {"num_leaves": self.num_leaves}
