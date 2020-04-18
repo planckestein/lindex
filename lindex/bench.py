@@ -17,6 +17,7 @@ from typing import Callable, List, Sequence
 from .base import Index
 from .binary_search import BinarySearch
 from .btree import BTree
+from .pla import PLAIndex
 from .rmi import RMI
 
 IndexFactory = Callable[[], Index]
@@ -39,6 +40,7 @@ def default_indexes() -> List[IndexFactory]:
         lambda: BTree(leaf_size=64, fanout=16),
         lambda: RMI(num_leaves=2 ** 10),
         lambda: RMI(num_leaves=2 ** 14),
+        lambda: PLAIndex(eps=64),
     ]
 
 
