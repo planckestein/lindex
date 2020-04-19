@@ -1,7 +1,7 @@
 """Interface shared by all index implementations."""
 
 from abc import ABC, abstractmethod
-from bisect import bisect_left
+from bisect import bisect_left, bisect_right
 from typing import List, Sequence
 
 
@@ -73,4 +73,21 @@ def bounded_lower_bound(keys: List[int], key: int, lo: int, hi: int) -> int:
     pos = bisect_left(keys, key, lo, hi)
     if (lo > 0 and keys[lo - 1] >= key) or (pos == hi and hi < n and keys[hi] < key):
         return bisect_left(keys, key)
+    return pos
+
+
+def bounded_upper_bound(keys: List[int], key: int, lo: int, hi: int) -> int:
+    """Like :func:`bounded_lower_bound`, but for ``bisect_right``."""
+    n = len(keys)
+    if lo < 0:
+        lo = 0
+    elif lo > n:
+        lo = n
+    if hi < lo:
+        hi = lo
+    elif hi > n:
+        hi = n
+    pos = bisect_right(keys, key, lo, hi)
+    if (lo > 0 and keys[lo - 1] > key) or (pos == hi and hi < n and keys[hi] <= key):
+        return bisect_right(keys, key)
     return pos

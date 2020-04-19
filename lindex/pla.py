@@ -4,12 +4,16 @@ Keys are split into segments by the greedy shrinking-cone algorithm of
 FITing-Tree (Galakatos et al., SIGMOD 2019). Every segment is a line that
 predicts the position of each of its keys within ``eps`` positions, so the
 last-mile search touches at most ``2 * eps + 3`` keys.
+
+As in the PGM-index (Ferragina and Vinciguerra, PVLDB 2020), the first keys
+of the segments are indexed recursively with the same algorithm until a
+single segment remains, so a lookup costs one small bounded search per
+level instead of a binary search over all segments.
 """
 
 import math
-from bisect import bisect_right
 
-from .base import Index, bounded_lower_bound
+from .base import Index, bounded_lower_bound, bounded_upper_bound
 
 
 def shrinking_cone_segments(xs, eps):
@@ -71,23 +75,35 @@ def _window(first_x, slopes, first_y, seg, key, eps, size):
 
 
 class PLAIndex(Index):
-    """Error-bounded piecewise linear index (single level).
+    """Recursive, error-bounded piecewise linear index.
 
-    Segments are located by binary search over their first keys.
+    ``eps`` bounds the last-mile search over the keys; ``eps_internal``
+    bounds the search inside the upper levels, which only route a lookup to
+    the right segment of the level below.
     """
 
     name = "PLA"
 
-    def __init__(self, eps=64):
+    def __init__(self, eps=64, eps_internal=4):
         super().__init__()
-        if eps < 1:
-            raise ValueError("eps must be at least 1")
+        if eps < 1 or eps_internal < 1:
+            raise ValueError("eps and eps_internal must be at least 1")
         self.eps = eps
-        self._segments = ([], [], [])
+        self.eps_internal = eps_internal
+        self._levels = []  # levels[0] indexes the keys, levels[-1] is the root
 
     def build(self, keys):
         self._set_keys(keys)
-        self._segments = shrinking_cone_segments(self._keys, self.eps)
+        self._levels = []
+        if not self._keys:
+            return self
+        level = shrinking_cone_segments(self._keys, self.eps)
+        self._levels.append(level)
+        # With eps >= 1 every segment covers at least two points, so each
+        # level is at most half the size of the one below.
+        while len(level[0]) > 1:
+            level = shrinking_cone_segments(level[0], self.eps_internal)
+            self._levels.append(level)
         return self
 
     def lower_bound(self, key):
@@ -97,17 +113,29 @@ class PLAIndex(Index):
             return 0
         if key > keys[-1]:
             return n
-        first_x, slopes, first_y = self._segments
-        seg = bisect_right(first_x, key) - 1
+        levels = self._levels
+        seg = 0
+        for k in range(len(levels) - 1, 0, -1):
+            first_x, slopes, first_y = levels[k]
+            child_x = levels[k - 1][0]
+            lo, hi = _window(
+                first_x, slopes, first_y, seg, key, self.eps_internal, len(child_x)
+            )
+            # last child segment whose first key is <= key
+            seg = bounded_upper_bound(child_x, key, lo, hi) - 1
+        first_x, slopes, first_y = levels[0]
         lo, hi = _window(first_x, slopes, first_y, seg, key, self.eps, n)
         return bounded_lower_bound(keys, key, lo, hi)
 
+    def height(self):
+        return len(self._levels)
+
     def num_segments(self):
-        return len(self._segments[0])
+        return len(self._levels[0][0]) if self._levels else 0
 
     def size_bytes(self):
-        # first key, slope and first position per segment
-        return 24 * self.num_segments()
+        # first key, slope and first position per segment, on every level
+        return 24 * sum(len(level[0]) for level in self._levels)
 
     def params(self):
-        return {"eps": self.eps}
+        return {"eps": self.eps, "eps_internal": self.eps_internal}
