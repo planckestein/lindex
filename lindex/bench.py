@@ -18,6 +18,7 @@ from .base import Index
 from .binary_search import BinarySearch
 from .btree import BTree
 from .pla import PLAIndex
+from .radix_spline import RadixSpline
 from .rmi import RMI
 
 IndexFactory = Callable[[], Index]
@@ -41,6 +42,7 @@ def default_indexes() -> List[IndexFactory]:
         lambda: RMI(num_leaves=2 ** 10),
         lambda: RMI(num_leaves=2 ** 14),
         lambda: PLAIndex(eps=64),
+        lambda: RadixSpline(eps=32, radix_bits=18),
     ]
 
 
