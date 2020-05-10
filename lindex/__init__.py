@@ -7,6 +7,6 @@ from .pla import PLAIndex
 from .radix_spline import RadixSpline
 from .rmi import RMI
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 
 __all__ = ["Index", "BinarySearch", "BTree", "RMI", "PLAIndex", "RadixSpline"]
