@@ -1,0 +1,13 @@
+language: python
+python:
+  - "3.7"
+  - "3.8"
+
+install:
+  - pip install -r requirements.txt
+
+script:
+  - python -m pytest -q
+  # smoke test of the benchmark pipeline on a small input
+  - python scripts/run_benchmarks.py --keys 20000 --queries 2000 --out /tmp/results.csv
+  - python scripts/plot_results.py /tmp/results.csv --out-dir /tmp/plots
