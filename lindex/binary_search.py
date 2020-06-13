@@ -14,6 +14,9 @@ class BinarySearch(Index):
         self._set_keys(keys)
         return self
 
+    def search_window(self, key):
+        return 0, len(self._keys)
+
     def lower_bound(self, key):
         return bisect_left(self._keys, key)
 

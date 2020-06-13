@@ -1,6 +1,6 @@
 """Static, bulk-loaded B+-tree; the classic comparison-based baseline."""
 
-from bisect import bisect_left, bisect_right
+from bisect import bisect_right
 
 from .base import Index
 
@@ -39,10 +39,10 @@ class BTree(Index):
         self._levels = levels[::-1]  # root first
         return self
 
-    def lower_bound(self, key):
+    def search_window(self, key):
         keys = self._keys
         if not keys:
-            return 0
+            return 0, 0
         fanout = self.fanout
         node = 0
         for level in self._levels:
@@ -52,7 +52,7 @@ class BTree(Index):
             pos = bisect_right(level, key, lo, hi) - 1
             node = pos if pos >= lo else lo
         lo = node * self.leaf_size
-        return bisect_left(keys, key, lo, min(lo + self.leaf_size, len(keys)))
+        return lo, min(lo + self.leaf_size, len(keys))
 
     def height(self):
         return len(self._levels)

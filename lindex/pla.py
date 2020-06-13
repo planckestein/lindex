@@ -13,7 +13,7 @@ level instead of a binary search over all segments.
 
 import math
 
-from .base import Index, bounded_lower_bound, bounded_upper_bound
+from .base import Index, bounded_upper_bound
 
 
 def shrinking_cone_segments(xs, eps):
@@ -106,13 +106,13 @@ class PLAIndex(Index):
             self._levels.append(level)
         return self
 
-    def lower_bound(self, key):
+    def search_window(self, key):
         keys = self._keys
         n = len(keys)
         if n == 0 or key <= keys[0]:
-            return 0
+            return 0, 0
         if key > keys[-1]:
-            return n
+            return n, n
         levels = self._levels
         seg = 0
         for k in range(len(levels) - 1, 0, -1):
@@ -124,8 +124,7 @@ class PLAIndex(Index):
             # last child segment whose first key is <= key
             seg = bounded_upper_bound(child_x, key, lo, hi) - 1
         first_x, slopes, first_y = levels[0]
-        lo, hi = _window(first_x, slopes, first_y, seg, key, self.eps, n)
-        return bounded_lower_bound(keys, key, lo, hi)
+        return _window(first_x, slopes, first_y, seg, key, self.eps, n)
 
     def height(self):
         return len(self._levels)

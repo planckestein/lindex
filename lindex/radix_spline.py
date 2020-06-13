@@ -16,7 +16,7 @@ of at most ``2 * eps + 3`` keys.
 
 from bisect import bisect_left
 
-from .base import Index, bounded_lower_bound
+from .base import Index
 
 
 def greedy_spline_corridor(keys, eps):
@@ -101,20 +101,20 @@ class RadixSpline(Index):
         self._table = table
         return self
 
-    def lower_bound(self, key):
+    def search_window(self, key):
         keys = self._keys
         n = len(keys)
         if n == 0 or key <= keys[0]:
-            return 0
+            return 0, 0
         if key > keys[-1]:
-            return n
+            return n, n
         xs, ys = self._xs, self._ys
         p = (key - self._min) >> self._shift
         # first spline point >= key; it has prefix p, or is the first one
         # with a larger prefix (table[p + 1])
         i = bisect_left(xs, key, self._table[p], self._table[p + 1])
         if xs[i] == key:
-            return ys[i]
+            return ys[i], ys[i]
         x0, y0, x1, y1 = xs[i - 1], ys[i - 1], xs[i], ys[i]
         pred = y0 + (key - x0) * (y1 - y0) / (x1 - x0)
         p = int(pred)
@@ -126,7 +126,7 @@ class RadixSpline(Index):
             lo = y0 + 1
         if hi > y1:
             hi = y1
-        return bounded_lower_bound(keys, key, lo, hi)
+        return lo, hi
 
     def num_spline_points(self):
         return len(self._xs)

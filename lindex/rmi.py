@@ -4,7 +4,7 @@ import math
 
 import numpy as np
 
-from .base import Index, bounded_lower_bound
+from .base import Index
 
 
 def fit_linear(x, y):
@@ -89,7 +89,7 @@ class RMI(Index):
         self._bounds = [int(b) for b in bounds]
         return self
 
-    def lower_bound(self, key):
+    def search_window(self, key):
         m = self.num_leaves
         j = int(self._ra * key + self._rb)
         if j < 0:
@@ -111,7 +111,7 @@ class RMI(Index):
             hi = end
         if lo >= hi:
             lo, hi = start, end
-        return bounded_lower_bound(self._keys, key, lo, hi)
+        return lo, hi
 
     def max_error(self):
         """Largest last-mile search window over all leaves."""

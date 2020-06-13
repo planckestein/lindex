@@ -2,7 +2,7 @@
 
 from abc import ABC, abstractmethod
 from bisect import bisect_left, bisect_right
-from typing import List, Sequence
+from typing import List, Sequence, Tuple
 
 
 class Index(ABC):
@@ -13,6 +13,11 @@ class Index(ABC):
     ``std::lower_bound`` and the lookup semantics used by SOSD, so an index
     can be checked against plain binary search for arbitrary probe keys,
     not only for keys that are present.
+
+    A lookup has two phases. ``search_window`` uses the index structure to
+    narrow down where the answer can be, and the last-mile search finds it
+    inside that window. Keeping the phases apart lets the benchmark report
+    the window size, which does not depend on the interpreter or hardware.
     """
 
     #: Short name used in benchmark output.
@@ -26,8 +31,16 @@ class Index(ABC):
         """Build the index over ``keys`` (sorted, unique) and return ``self``."""
 
     @abstractmethod
+    def search_window(self, key: int) -> Tuple[int, int]:
+        """Return ``(lo, hi)`` such that the answer is in ``lo..hi`` (inclusive).
+
+        This is the range handed to ``bisect_left(keys, key, lo, hi)``.
+        """
+
     def lower_bound(self, key: int) -> int:
         """Return the position of the first key that is >= ``key``."""
+        lo, hi = self.search_window(key)
+        return bounded_lower_bound(self._keys, key, lo, hi)
 
     @abstractmethod
     def size_bytes(self) -> int:
