@@ -6,12 +6,19 @@ All numbers come from CPython, so absolute latencies are dominated by
 interpreter overhead; the interesting part is how the structures compare
 under the same overhead and how their search windows behave on different
 distributions.
+
+Besides latency we report ``log2_window``: the mean of
+``log2(hi - lo + 1)`` over the lookups, where ``[lo, hi]`` is the window
+returned by ``search_window``. It approximates the number of steps of the
+last-mile binary search and is independent of the machine.
 """
 
 import csv
+import math
 import random
 import time
 from dataclasses import asdict, dataclass
+from bisect import bisect_left
 from typing import Callable, List, Sequence
 
 from .base import Index
@@ -33,6 +40,7 @@ class Result:
     build_ms: float
     size_bytes: int
     lookup_ns: float
+    log2_window: float
 
 
 def default_indexes() -> List[IndexFactory]:
@@ -53,6 +61,30 @@ def make_queries(keys: Sequence[int], num_queries: int, seed: int = 0) -> List[i
     return [keys[rng.randrange(n)] for _ in range(num_queries)]
 
 
+def verify(index: Index, keys: List[int], queries: Sequence[int]) -> None:
+    """Check lookups against bisect, including keys that are not present."""
+    for q in queries:
+        for probe in (q, q + 1):
+            expected = bisect_left(keys, probe)
+            got = index.lower_bound(probe)
+            if got != expected:
+                raise AssertionError(
+                    "{!r}: lower_bound({}) = {}, expected {}".format(
+                        index, probe, got, expected
+                    )
+                )
+
+
+def mean_log2_window(index: Index, queries: Sequence[int]) -> float:
+    if not queries:
+        return 0.0
+    total = 0.0
+    for q in queries:
+        lo, hi = index.search_window(q)
+        total += math.log2(hi - lo + 1)
+    return total / len(queries)
+
+
 def format_params(params: dict) -> str:
     return " ".join("{}={}".format(k, v) for k, v in params.items())
 
@@ -63,11 +95,13 @@ def measure(
     keys: List[int],
     queries: List[int],
     repeats: int = 3,
+    num_verify: int = 10000,
 ) -> Result:
     index = factory()
     t0 = time.perf_counter()
     index.build(keys)
     build_ms = (time.perf_counter() - t0) * 1e3
+    verify(index, keys, queries[:num_verify])
 
     lookup = index.lower_bound
     best = float("inf")
@@ -85,6 +119,7 @@ def measure(
         build_ms=build_ms,
         size_bytes=index.size_bytes(),
         lookup_ns=best / max(len(queries), 1) * 1e9,
+        log2_window=mean_log2_window(index, queries),
     )
 
 
@@ -102,8 +137,14 @@ def run_dataset(
         r = measure(factory, dataset, keys, queries)
         log(
             "{:<10} {:<13} {:<28} build {:>9.1f} ms  size {:>10} B  "
-            "lookup {:>7.0f} ns".format(
-                r.dataset, r.index, r.params, r.build_ms, r.size_bytes, r.lookup_ns
+            "lookup {:>7.0f} ns  log2 window {:>5.2f}".format(
+                r.dataset,
+                r.index,
+                r.params,
+                r.build_ms,
+                r.size_bytes,
+                r.lookup_ns,
+                r.log2_window,
             )
         )
         results.append(r)
@@ -121,18 +162,20 @@ def write_csv(results: Sequence[Result], path: str) -> None:
 
 def to_markdown(results: Sequence[Result]) -> str:
     lines = [
-        "| dataset | index | params | build (ms) | size (KiB) | lookup (ns) |",
-        "|---|---|---|---:|---:|---:|",
+        "| dataset | index | params | build (ms) | size (KiB) | lookup (ns) "
+        "| log2 window |",
+        "|---|---|---|---:|---:|---:|---:|",
     ]
     for r in results:
         lines.append(
-            "| {} | {} | {} | {:.1f} | {:.1f} | {:.0f} |".format(
+            "| {} | {} | {} | {:.1f} | {:.1f} | {:.0f} | {:.2f} |".format(
                 r.dataset,
                 r.index,
                 r.params or "-",
                 r.build_ms,
                 r.size_bytes / 1024.0,
                 r.lookup_ns,
+                r.log2_window,
             )
         )
     return "\n".join(lines)
