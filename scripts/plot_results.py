@@ -30,21 +30,21 @@ def group(rows):
     return out
 
 
-def plot_lookup(rows, path):
+def plot_bars(rows, path, column, ylabel, title):
     data = group(rows)
     datasets = list(data)
     labels = list(OrderedDict((label(r), None) for r in rows))
     width = 0.8 / len(labels)
-    fig, ax = plt.subplots(figsize=(10, 4.5))
+    fig, ax = plt.subplots(figsize=(10, 5))
     for i, lab in enumerate(labels):
         xs = [d + (i - (len(labels) - 1) / 2.0) * width for d in range(len(datasets))]
-        ys = [float(data[ds][lab]["lookup_ns"]) if lab in data[ds] else 0 for ds in datasets]
+        ys = [float(data[ds][lab][column]) if lab in data[ds] else 0 for ds in datasets]
         ax.bar(xs, ys, width, label=lab)
     ax.set_xticks(range(len(datasets)))
     ax.set_xticklabels(datasets)
-    ax.set_ylabel("lookup latency (ns)")
-    ax.set_title("Lookup latency, {} keys".format(rows[0]["num_keys"]))
-    ax.legend(fontsize=8, ncol=2)
+    ax.set_ylabel(ylabel)
+    ax.set_title("{}, {} keys".format(title, rows[0]["num_keys"]))
+    ax.legend(fontsize=8, ncol=3, loc="upper center", bbox_to_anchor=(0.5, -0.08))
     ax.grid(axis="y", alpha=0.3)
     fig.tight_layout()
     fig.savefig(path, dpi=150)
@@ -81,7 +81,21 @@ def main(argv=None):
         print("no rows in {}".format(args.csv), file=sys.stderr)
         return 1
     os.makedirs(args.out_dir, exist_ok=True)
-    plot_lookup(rows, os.path.join(args.out_dir, "lookup.png"))
+    plot_bars(
+        rows,
+        os.path.join(args.out_dir, "lookup.png"),
+        "lookup_ns",
+        "lookup latency (ns)",
+        "Lookup latency",
+    )
+    if "log2_window" in rows[0]:
+        plot_bars(
+            rows,
+            os.path.join(args.out_dir, "log2_window.png"),
+            "log2_window",
+            "mean log2(search window)",
+            "Last-mile search window",
+        )
     plot_tradeoff(rows, os.path.join(args.out_dir, "size_vs_lookup.png"))
     print("wrote plots to {}".format(args.out_dir))
     return 0
