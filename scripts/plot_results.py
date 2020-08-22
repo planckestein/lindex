@@ -19,7 +19,9 @@ def load(path):
 
 
 def label(row):
-    return "{} ({})".format(row["index"], row["params"]) if row["params"] else row["index"]
+    if not row["params"]:
+        return row["index"]
+    return "{} ({})".format(row["index"], row["params"])
 
 
 def group(rows):

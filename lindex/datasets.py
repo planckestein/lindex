@@ -31,7 +31,9 @@ def generate(name: str, n: int, seed: int = 42) -> List[int]:
     while len(keys) < n:
         rounds += 1
         if rounds > 100:
-            raise RuntimeError("could not draw {} unique keys from {!r}".format(n, name))
+            raise RuntimeError(
+                "could not draw {} unique keys from {!r}".format(n, name)
+            )
         need = n - len(keys)
         keys = np.union1d(keys, _sample(name, rng, int(need * 1.1) + 16))
     if len(keys) > n:
