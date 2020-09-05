@@ -116,12 +116,33 @@ executes.
    The paper tunes the radix bits per data set; with a fixed setting the
    table dominates the size.
 
+### Parameter sweep
+
+`scripts/sweep.py` varies the main parameter of each structure and records
+size and mean log2 window (1M keys, [`results/sweep.csv`](results/sweep.csv)).
+Two results stand out:
+
+| index | setting | size (KiB), uniform | log2 window, uniform | log2 window, clustered |
+|---|---|---:|---:|---:|
+| RadixSpline | radix_bits=8 | 14.1 | 6.05 | 6.04 |
+| RadixSpline | radix_bits=18 | 1037.1 | 6.05 | 6.04 |
+| RMI | num_leaves=2^16 | 2560.0 | 2.52 | 10.87 |
+| PLA | eps=8 | 121.0 | 4.28 | 4.27 |
+
+* For RadixSpline the radix bits do not change the last-mile window at
+  all (it is fixed by `eps`); they only shorten the search over spline
+  points. 8 bits give a 70x smaller index here. That search is not part of
+  the window metric, so this sweep alone cannot pick the best setting.
+* A 2.5 MiB RMI still has a typical window of ~1,900 keys on `clustered`
+  (geometric mean, 2^10.87), while PLA with eps=8 (121-134 KiB) guarantees
+  at most 19 keys. More leaves do not fix a root model that routes badly.
+
 ## Repository layout
 
 ```
 lindex/          the package: indexes, datasets, benchmark harness
 tests/           pytest suite; every index is checked against bisect
-scripts/         run_benchmarks.py, plot_results.py
+scripts/         run_benchmarks.py, plot_results.py, sweep.py
 docs/design.md   design notes and open questions
 results/         numbers and plots from the run above
 ```

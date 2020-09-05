@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.3.0 - 2020-09-05
+
+- Lookups are split into `search_window()` and a shared last-mile search;
+  the benchmark reports the mean log2 window size next to latency.
+- The benchmark verifies every index against `bisect` (including absent
+  keys) before timing it.
+- `scripts/sweep.py`: size vs. search window for each structure's main
+  parameter.
+- Search window plot; design notes in `docs/design.md`; first results in
+  the README.
+
 ## 0.2.0 - 2020-05-10
 
 - RadixSpline: GreedySplineCorridor spline plus a radix table on the key prefix.
